@@ -215,6 +215,8 @@ uis.directive('uiSelect',
 
         scope.$on('$destroy', function() {
           $window.document.removeEventListener('click', onDocumentClick, true);
+          if(dropdown)
+            $select.$animate.off('enter', dropdown);
         });
 
         // Move transcluded elements to their correct position in main template
