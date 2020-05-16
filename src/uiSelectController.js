@@ -5,8 +5,8 @@
  * put as much logic in the controller (instead of the link functions) as possible so it can be easily tested.
  */
 uis.controller('uiSelectCtrl',
-  ['$scope', '$element', '$timeout', '$filter', '$$uisDebounce', 'uisRepeatParser', 'uiSelectMinErr', 'uiSelectConfig', '$parse', '$injector', '$window',
-  function($scope, $element, $timeout, $filter, $$uisDebounce, RepeatParser, uiSelectMinErr, uiSelectConfig, $parse, $injector, $window) {
+  ['$scope', '$element', '$timeout', '$filter', '$$uisDebounce', 'uisRepeatParser', 'uiSelectMinErr', 'uiSelectConfig', '$parse', '$injector', '$window', 'uisOffset',
+  function($scope, $element, $timeout, $filter, $$uisDebounce, RepeatParser, uiSelectMinErr, uiSelectConfig, $parse, $injector, $window, uisOffset) {
 
   var ctrl = this;
 
@@ -474,9 +474,9 @@ uis.controller('uiSelectCtrl',
   };
 
   // Toggle dropdown
-  ctrl.toggle = function(e) {
+  ctrl.toggle = function(e, skipFocusser) {
     if (ctrl.open) {
-      ctrl.close();
+      ctrl.close(skipFocusser);
     } else {
       ctrl.activate();
     }
@@ -546,9 +546,8 @@ uis.controller('uiSelectCtrl',
           if (containerWidth === 0) {
             return false;
           }
-          var inputWidth = containerWidth - input.offsetLeft;
-          if (inputWidth < 50) inputWidth = containerWidth;
-          ctrl.searchInput.css('width', inputWidth+'px');
+
+          ctrl.searchInput.css('width', '100%');
           return true;
         };
 
@@ -569,6 +568,28 @@ uis.controller('uiSelectCtrl',
         }, angular.noop);
       }
     });
+  };
+
+  ctrl.resizeInput = function () {
+    var placeholder = angular.element('.ui-select-placeholder');
+    if (placeholder.length === 0) {
+      return;
+    }
+    var offset;
+    if (ctrl.open) {
+      placeholder[0].style.width = '100%';
+      offset = uisOffset(placeholder);
+
+      placeholder[0].style.width = offset.width + 'px';
+      placeholder[0].style.height = offset.height + 'px';
+
+      $element[0].style.position = 'absolute';
+      $element[0].style.left = offset.left + 'px';
+      $element[0].style.top = offset.top + 'px';
+    } else {
+      offset = uisOffset($element);
+    }
+    $element[0].style.width = offset.width + 'px';
   };
 
   function _handleDropDownSelection(key) {
@@ -744,13 +765,37 @@ uis.controller('uiSelectCtrl',
 
   var onResize = $$uisDebounce(function() {
     ctrl.sizeSearchInput();
+    ctrl.resizeInput();
   }, 50);
 
+  var closeOnEvent = function() {
+    if (ctrl.open) {
+      ctrl.open = false;
+      if (!$scope.$root || !$scope.$root.$$phase) {
+        $scope.$apply();
+      }
+    }
+  };
+
+  var onEscape = function (event) {
+    if (ctrl.open && event.keyCode === 27) {
+      closeOnEvent();
+    }
+  };
   angular.element($window).bind('resize', onResize);
+  angular.element($window).bind('scroll', closeOnEvent);
+  angular.element($window).bind('popstate', closeOnEvent);
+  angular.element($window).bind('keydown', onEscape);
+
+  angular.element('.modal-body').bind('scroll', closeOnEvent);
 
   $scope.$on('$destroy', function() {
     ctrl.searchInput.off('keyup keydown tagged blur paste');
     angular.element($window).off('resize', onResize);
+    angular.element($window).off('scroll', onResize);
+    angular.element($window).off('popstate', onResize);
+    angular.element($window).off('keydown', onEscape);
+    angular.element('.modal-body').off('scroll', onResize);
   });
 
   $scope.$watch('$select.activeIndex', function(activeIndex) {
